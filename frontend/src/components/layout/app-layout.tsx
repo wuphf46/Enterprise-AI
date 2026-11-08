@@ -1,13 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Outlet } from 'react-router-dom';
 import { Button } from '../ui/button';
+import { useUiStore } from '../../store/ui-store';
 import { Sidebar } from './sidebar';
 import { Topbar } from './topbar';
 
 export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const theme = useUiStore((state) => state.theme);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', theme === 'light');
+  }, [theme]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -31,7 +37,7 @@ export function AppLayout() {
       </div>
       <Button
         aria-label="Open navigation"
-        className="fixed bottom-5 right-5 z-20 shadow-lg lg:hidden"
+        className="fixed bottom-5 right-5 z-20 lg:hidden"
         size="icon"
         onClick={() => setSidebarOpen(true)}
       >

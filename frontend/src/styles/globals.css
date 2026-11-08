@@ -9,7 +9,7 @@
   --foreground: 210 20% 96%;
   --card: 222 18% 12%;
   --card-foreground: 210 20% 96%;
-  --primary: 265 75% 70%;
+  --primary: 272 48% 64%;
   --primary-foreground: 222 20% 9%;
   --muted: 222 16% 17%;
   --muted-foreground: 218 12% 65%;
@@ -26,3 +26,20 @@ body { margin: 0; min-width: 320px; background: hsl(var(--background)); }
 button, a { -webkit-tap-highlight-color: transparent; }
 @keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .animate-fade-in { animation: fade-in 240ms ease-out; }
+
+.light {
+  color-scheme: light;
+  --background: 40 20% 97%;
+  --foreground: 224 18% 14%;
+  --card: 40 20% 100%;
+  --card-foreground: 224 18% 14%;
+  --primary: 272 38% 45%;
+  --primary-foreground: 40 20% 98%;
+  --muted: 40 12% 92%;
+  --muted-foreground: 224 10% 42%;
+  --accent: 40 12% 91%;
+  --accent-foreground: 224 18% 14%;
+  --border: 35 12% 84%;
+  --input: 35 12% 84%;
+  --ring: 272 38% 45%;
+}
