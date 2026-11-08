@@ -1,4 +1,4 @@
-"""Initialize Atlas tables in Render PostgreSQL from infra/schema.sql.
+"""Initialize tables in Render PostgreSQL from infra/schema.sql.
 
 Usage (from project root): python scripts/init_db.py
 Safe to rerun: the supplied schema uses CREATE ... IF NOT EXISTS.

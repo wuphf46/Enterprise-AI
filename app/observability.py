@@ -14,7 +14,7 @@ def initialize():
         return
     try:
         import rius
-        rius.init(service_name=os.getenv("RIUS_SERVICE_NAME", "atlas-ai-fde"), capture_content=False)
+        rius.init(service_name=os.getenv("RIUS_SERVICE_NAME", "ai-fde"), capture_content=False)
         log.info("Rius observability enabled")
     except Exception:
         log.exception("Rius initialization failed; application will continue without telemetry")

@@ -12,7 +12,7 @@ from app.observability import trace, initialize
 initialize()
 
 logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
-log=logging.getLogger('atlas.worker')
+log=logging.getLogger('enterprise.worker')
 
 
 def parse(blob:bytes, suffix:str):
