@@ -38,7 +38,7 @@ jobs:
 
       - name: Check Python Syntax
         run: |
-          python -m compileall -q app worker scripts
+          python -m compileall -q backend/app backend/worker backend/scripts
 
   # ==========================================
   # 2. CONTINUOUS DELIVERY - BUILD AND PUSH ECR

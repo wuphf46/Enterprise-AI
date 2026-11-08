@@ -1,6 +1,6 @@
-"""Initialize tables in Render PostgreSQL from infra/schema.sql.
+"""Initialize tables in backend/infra/schema.sql.
 
-Usage (from project root): python scripts/init_db.py
+Usage (from project root): python backend/scripts/init_db.py
 Safe to rerun: the supplied schema uses CREATE ... IF NOT EXISTS.
 """
 from pathlib import Path
@@ -10,16 +10,16 @@ import psycopg
 from dotenv import load_dotenv
 import os
 
-ROOT = Path(__file__).resolve().parents[1]
-load_dotenv(ROOT / '.env')
-SCHEMA = ROOT / 'infra' / 'schema.sql'
+ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(ROOT / 'backend' / '.env')
+SCHEMA = ROOT / 'backend' / 'infra' / 'schema.sql'
 REQUIRED = ('documents', 'feedback', 'audit_events', 'approvals', 'chat_messages')
 
 
 def main():
     url = os.getenv('DATABASE_URL', '').strip()
     if not url or 'YOUR_' in url or 'USERNAME:' in url:
-        print('ERROR: Set a real DATABASE_URL in the project .env file.')
+        print('ERROR: Set a real DATABASE_URL in backend/.env.')
         return 1
     if not SCHEMA.is_file():
         print(f'ERROR: Schema not found: {SCHEMA}')
