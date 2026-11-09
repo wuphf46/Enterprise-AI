@@ -2,13 +2,14 @@
 
 This repository is organized as a monorepo:
 
-- `backend/` contains the Python API, ingestion worker, database script, and legacy HTML/CSS/JS UI.
+- `backend/` contains the Python API (`app/`), ingestion worker, and database scripts.
+- `backend/app/` is organized into `core/` (config, database, security), `routers/` (HTTP endpoints), and `services/` (business logic and RAG).
 - `backend/infra/` contains backend database infrastructure such as the PostgreSQL schema.
 - `backend/.env` and `backend/.env.example` contain backend environment configuration.
-- `frontend/` contains the React workspace scaffold for the future frontend migration.
+- `frontend/` contains the React app (Knova UI), deployed separately.
 - `venv/` is local development tooling and is not part of the application or deployment image.
 
-The current deployment continues to build and serve the legacy UI from the Python backend. Run the database setup script from the repository root with:
+The backend serves the API only. Run the database setup script from the repository root with:
 
 ```bash
 python backend/scripts/init_db.py
@@ -28,9 +29,35 @@ The script accepts a username, tenant, role (`user` or `admin`), and password wi
 
 To enable the user registration page locally, set `AUTH_ALLOW_REGISTRATION=true` in `backend/.env`. Keep it disabled in production unless registration is protected by an invitation or another onboarding control. Registered accounts always receive the `user` role; administrator accounts must be created with `create_user.py`.
 
-Run backend authentication tests with:
+## Deployment
+
+The backend runs on the EC2 self-hosted runner as a Docker container published on port `8000` (public IP `100.31.148.108`). The frontend is deployed to Vercel at `https://knova-enterprise-ai.vercel.app`.
+
+### Backend
+
+- Set the repository secret `CORS_ORIGINS` to `https://knova-enterprise-ai.vercel.app` (comma-separate additional origins). It is injected into the container by `.github/workflows/cicd.yaml`.
+- Set `AUTH_COOKIE_SECURE=true` in production.
+- Allow inbound TCP `8000` in the EC2 security group for the hosts that must reach the API.
+- Verify on the instance: `curl http://127.0.0.1:8000/health/live`.
+
+### Frontend (Vercel)
+
+- Set the Vercel project root directory to `frontend`.
+- Set `VITE_API_URL=https://knova-enterprise-ai.vercel.app` in the Vercel project environment (mirrored in `frontend/.env.production`).
+- Because `vercel.json` is not used, the Vercel project must proxy `/api/*` and `/health/*` to `http://100.31.148.108:8000` with project-level routing rules (Vercel Dashboard -> Project -> Routing). Without that proxy, requests hit Vercel and return 404.
+- The browser only talks to the Vercel HTTPS origin, so mixed content and CORS are avoided.
+- Verify after deploying: `curl https://knova-enterprise-ai.vercel.app/health/live`.
+
+### S3 browser uploads
+
+The bucket must allow the frontend origin for presigned `PUT` uploads. The policy is stored in `backend/infra/s3-cors.json`; apply it from the repository root with:
 
 ```bash
-venv\Scripts\python.exe -m pip install -r backend/requirements-dev.txt
-venv\Scripts\python.exe -m pytest backend/tests -q
+python backend/scripts/configure_s3_cors.py
 ```
+
+The script reads `S3_BUCKET` from `backend/.env` and allows `https://knova-enterprise-ai.vercel.app` by default. Override it with a comma-separated `FRONTEND_ORIGINS` environment variable when needed.
+
+### Direct HTTPS (optional)
+
+To call the backend directly instead of through the Vercel proxy, terminate TLS in front of port `8000` (for example with Caddy or an ALB) and point `VITE_API_URL` at that `https://` origin. Cross-site refresh cookies then require `SameSite=None; Secure`, which needs an `AUTH_COOKIE_SAMESITE` setting in the backend.

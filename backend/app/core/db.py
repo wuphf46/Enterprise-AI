@@ -2,7 +2,7 @@ import json
 from contextlib import contextmanager
 import psycopg
 from psycopg.rows import dict_row
-from app.config import settings
+from app.core.config import settings
 
 @contextmanager
 def connection():

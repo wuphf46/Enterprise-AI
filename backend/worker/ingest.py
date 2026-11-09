@@ -3,10 +3,11 @@ import logging
 from pathlib import Path
 from docx import Document
 from pypdf import PdfReader
-from app.aws import client, embed
-from app.vector import upsert
-from app.config import settings
-from app.db import connection, audit
+from app.core.aws import client
+from app.core.config import settings
+from app.core.db import connection, audit
+from app.services.rag.llm import embed
+from app.services.rag.vector_store import upsert
 
 logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
 log=logging.getLogger('enterprise.worker')

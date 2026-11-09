@@ -3,7 +3,7 @@ import time
 from functools import lru_cache
 from pinecone import Pinecone, ServerlessSpec
 from pinecone.exceptions import NotFoundException
-from app.config import settings
+from app.core.config import settings
 
 
 log = logging.getLogger(__name__)

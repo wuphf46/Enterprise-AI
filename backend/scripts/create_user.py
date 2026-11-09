@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'backend'))
 load_dotenv(ROOT / 'backend' / '.env')
 
-from app.db import connection  # noqa: E402
+from app.core.db import connection  # noqa: E402
 
 
 def main() -> int:

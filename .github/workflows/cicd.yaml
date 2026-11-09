@@ -321,7 +321,7 @@ jobs:
           curl --fail --silent --show-error \
             --retry 5 \
             --retry-delay 3 \
-            http://127.0.0.1:8000/ \
+            http://127.0.0.1:8000/health/live \
             > /dev/null
 
           echo "Enterprise AI deployed successfully"

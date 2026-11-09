@@ -1,6 +1,6 @@
 import uuid
-from app.db import connection
-from app.config import settings
+from app.core.db import connection
+from app.core.config import settings
 
 def assert_owned(tenant: str, conversation_id: uuid.UUID, owner_sub: str) -> None:
     with connection() as conn:
