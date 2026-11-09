@@ -13,8 +13,18 @@ export function apiErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
+function resolveBaseUrl(): string {
+  const configured = (import.meta.env.VITE_API_URL ?? '').trim();
+  if (!configured) return '';
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && configured.startsWith('http://')) {
+    console.warn('Ignoring insecure VITE_API_URL on an HTTPS page; using the same-origin API proxy.');
+    return '';
+  }
+  return configured;
+}
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '',
+  baseURL: resolveBaseUrl(),
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',

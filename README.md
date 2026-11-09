@@ -44,10 +44,9 @@ The backend runs on the EC2 self-hosted runner as a Docker container published o
 
 - Set the Vercel project root directory to `frontend`; the framework preset is Vite.
 - Use the default commands: install `npm install`, build `npm run build`, output directory `dist`.
-- Set `VITE_API_URL=https://knova-enterprise-ai.vercel.app` in the Vercel project environment (mirrored in `frontend/.env.production`).
+- Leave `VITE_API_URL` empty in the Vercel project environment. `frontend/vercel.json` proxies `/api/*`, `/health/*`, and `/openapi.json` to `http://100.31.148.108:8000`, so the browser only talks to the HTTPS Vercel origin (no mixed content, no CORS).
+- If `VITE_API_URL` is already set in Vercel, change it to `https://knova-enterprise-ai.vercel.app` or delete it. The client also ignores an `http://` value on HTTPS pages as a safeguard.
 - There is no root `package.json` or npm workspace; install and build only from `frontend/`.
-- Because `vercel.json` is not used, the Vercel project must proxy `/api/*` and `/health/*` to `http://100.31.148.108:8000` with project-level routing rules (Vercel Dashboard -> Project -> Routing). Without that proxy, requests hit Vercel and return 404.
-- The browser only talks to the Vercel HTTPS origin, so mixed content and CORS are avoided.
 - Verify after deploying: `curl https://knova-enterprise-ai.vercel.app/health/live`.
 
 ### S3 browser uploads
