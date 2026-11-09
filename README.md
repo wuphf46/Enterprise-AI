@@ -6,7 +6,7 @@ This repository is organized as a monorepo:
 - `backend/app/` is organized into `core/` (config, database, security), `routers/` (HTTP endpoints), and `services/` (business logic and RAG).
 - `backend/infra/` contains backend database infrastructure such as the PostgreSQL schema.
 - `backend/.env` and `backend/.env.example` contain backend environment configuration.
-- `frontend/` contains the React app (Knova UI), deployed separately.
+- `frontend/` contains the standalone Vite + React app (Knova UI) with its own `package.json` and `package-lock.json`; it is deployed to Vercel from that directory.
 - `venv/` is local development tooling and is not part of the application or deployment image.
 
 The backend serves the API only. Run the database setup script from the repository root with:
@@ -42,8 +42,10 @@ The backend runs on the EC2 self-hosted runner as a Docker container published o
 
 ### Frontend (Vercel)
 
-- Set the Vercel project root directory to `frontend`.
+- Set the Vercel project root directory to `frontend`; the framework preset is Vite.
+- Use the default commands: install `npm install`, build `npm run build`, output directory `dist`.
 - Set `VITE_API_URL=https://knova-enterprise-ai.vercel.app` in the Vercel project environment (mirrored in `frontend/.env.production`).
+- There is no root `package.json` or npm workspace; install and build only from `frontend/`.
 - Because `vercel.json` is not used, the Vercel project must proxy `/api/*` and `/health/*` to `http://100.31.148.108:8000` with project-level routing rules (Vercel Dashboard -> Project -> Routing). Without that proxy, requests hit Vercel and return 404.
 - The browser only talks to the Vercel HTTPS origin, so mixed content and CORS are avoided.
 - Verify after deploying: `curl https://knova-enterprise-ai.vercel.app/health/live`.
