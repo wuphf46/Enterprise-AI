@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     min_relevance:float=0.25
     hitl_enabled:bool=True
     memory_turns:int=6
+    jwt_secret_key:str=''
+    jwt_issuer:str='enterprise-ai'
+    jwt_audience:str='enterprise-ai-web'
+    access_token_minutes:int=15
+    refresh_token_days:int=14
+    auth_cookie_secure:bool=False
+    cors_origins:str=''
+    auth_allow_registration:bool=False
 
 
 @lru_cache

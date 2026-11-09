@@ -11,6 +11,5 @@ langgraph>=0.2,<2
 pinecone>=5,<9
 
 python-dotenv==1.0.1
-
-#  observability 
-glassflow-rius>=1.0,<2.0
+PyJWT==2.10.1
+pwdlib[argon2]==0.2.1

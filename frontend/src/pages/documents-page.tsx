@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, FileText, Loader2, UploadCloud } from 'lucide-react';
+import { CheckCircle2, FileText, Loader2, Trash2, UploadCloud } from 'lucide-react';
 import { api } from '../lib/api';
 import { Button } from '../components/ui/button';
+import { ConfirmDialog } from '../components/ui/confirm-dialog';
+import { useAuthStore } from '../store/auth-store';
 
 type DocumentRecord = {
   id: string;
@@ -17,16 +19,23 @@ async function uploadDocument(file: File) {
     '/api/documents/uploads',
     { filename: file.name },
   );
-  await api.put(data.upload_url, file, { headers: data.headers });
+  const upload = await fetch(data.upload_url, { method: 'PUT', headers: data.headers, body: file });
+  if (!upload.ok) throw new Error(`Upload to storage failed (${upload.status}).`);
   await api.post('/api/documents/complete', { document_id: data.document_id });
 }
 
 export function DocumentsPage() {
   const [file, setFile] = useState<File | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<DocumentRecord | null>(null);
   const queryClient = useQueryClient();
+  const isAdmin = useAuthStore((state) => state.user?.role === 'admin');
   const documents = useQuery({
     queryKey: ['documents'],
     queryFn: async () => (await api.get<{ documents: DocumentRecord[] }>('/api/documents')).data.documents,
+  });
+  const remove = useMutation({
+    mutationFn: (documentId: string) => api.delete(`/api/documents/${documentId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['documents'] }),
   });
   const upload = useMutation({
     mutationFn: () => {
@@ -38,6 +47,11 @@ export function DocumentsPage() {
       await queryClient.invalidateQueries({ queryKey: ['documents'] });
     },
   });
+
+  function confirmDelete() {
+    if (!pendingDelete) return;
+    remove.mutate(pendingDelete.id, { onSettled: () => setPendingDelete(null) });
+  }
 
   return (
     <section className="animate-fade-in space-y-8">
@@ -74,13 +88,39 @@ export function DocumentsPage() {
             {documents.data?.map((document) => (
               <div className="flex items-center justify-between rounded-xl border border-border bg-background/50 px-4 py-3" key={document.id}>
                 <div className="flex min-w-0 items-center gap-3"><FileText className="shrink-0 text-muted-foreground" size={18} /><div className="min-w-0"><p className="truncate text-sm font-medium">{document.title}</p><p className="text-xs text-muted-foreground">Version {document.current_version}</p></div></div>
-                <span className="ml-3 rounded-full bg-emerald-400/10 px-2.5 py-1 text-xs capitalize text-emerald-300">{document.status}</span>
+                <div className="ml-3 flex shrink-0 items-center gap-2">
+                  <span className="rounded-full bg-emerald-400/10 px-2.5 py-1 text-xs capitalize text-emerald-300">{document.status}</span>
+                  {isAdmin && (
+                    <Button
+                       aria-label={`Delete ${document.title}`}
+                       className="h-8 w-8 text-muted-foreground hover:text-red-300"
+                       disabled={remove.isPending}
+                       size="icon"
+                       variant="ghost"
+                       onClick={() => setPendingDelete(document)}
+                     >
+                      <Trash2 size={16} />
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
             {!documents.isLoading && !documents.data?.length && <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No documents uploaded yet.</p>}
+            {remove.isError && <p className="text-sm text-red-300">{remove.error instanceof Error ? remove.error.message : 'Unable to delete document.'}</p>}
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        cancelLabel="Cancel"
+        confirmLabel={remove.isPending ? 'Deleting...' : 'Delete'}
+        description={pendingDelete ? `Delete "${pendingDelete.title}"? This removes it from the knowledge base and cannot be undone.` : ''}
+        open={pendingDelete !== null}
+        pending={remove.isPending}
+        title="Delete document"
+        onCancel={() => { if (!remove.isPending) setPendingDelete(null); }}
+        onConfirm={confirmDelete}
+      />
     </section>
   );
 }

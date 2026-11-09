@@ -1,4 +1,3 @@
-from app.observability import trace
 from typing import TypedDict,Any
 from langgraph.graph import StateGraph,START,END
 from app.aws import embed,answer
@@ -17,11 +16,9 @@ class State(TypedDict,total=False):
     history:list
 
 
-@trace("guard")
 def guard(s): return {'question':check_input(s['question'])}
 
 
-@trace("retrieve")
 def retrieve(s):
     p=s['principal']
     # Include the most recent user question for short follow-ups such as 'summarize that'.
@@ -37,19 +34,16 @@ def retrieve(s):
 def route(s): return 'generate' if s['passages'] else 'no_evidence'
 
 
-@trace("no_evidence")
 def no_evidence(s): return {'answer':'I could not find supporting evidence in documents you are authorized to access.','status':'no_evidence'}
 
 
 
-@trace("generate")
 def generate(s):
     evidence='\n\n'.join(f'[{i+1}] {h["metadata"].get("title", "Document")}, page {h["metadata"].get("page",1)}: {h["metadata"].get("text", "")}' for i,h in enumerate(s['passages']))
     return {'answer':answer(s['question'],evidence,s.get('history',[])),'status':'answered'}
 
 
 
-@trace("validate")
 def validate(s): return {'answer':check_output(s['answer'])}
 
 
@@ -68,7 +62,6 @@ graph=make_graph()
 
 
 
-@trace("chat")
 def chat(p,question,history=None):
     r=graph.invoke({'principal':p,'question':question,'history':history or []})
     return {'answer':r['answer'],'sources':r.get('sources',[]),'status':r.get('status','answered')}

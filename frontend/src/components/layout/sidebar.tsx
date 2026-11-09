@@ -2,6 +2,7 @@ import { FileText, LayoutDashboard, MessageSquare, ShieldCheck, X } from 'lucide
 import { NavLink } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
+import { useAuthStore } from '../../store/auth-store';
 
 const navigation = [
   { label: 'Chat', path: '/chat', icon: MessageSquare },
@@ -17,6 +18,8 @@ type SidebarProps = {
 };
 
 export function Sidebar({ open, collapsed, onClose }: SidebarProps) {
+  const user = useAuthStore((state) => state.user);
+  const visibleNavigation = navigation.filter((item) => user?.role === 'admin' || (item.path !== '/admin' && item.path !== '/approvals'));
   return (
     <>
       {open && <button aria-label="Close navigation" className="fixed inset-0 z-30 bg-slate-950/30 lg:hidden" onClick={onClose} />}
@@ -29,14 +32,14 @@ export function Sidebar({ open, collapsed, onClose }: SidebarProps) {
       >
         <div className="flex h-16 items-center justify-between border-b border-border px-5">
           <NavLink className="flex items-center gap-3" to="/chat" onClick={onClose}>
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">EA</span>
-            <span className={cn('text-sm font-semibold tracking-tight', collapsed && 'lg:hidden')}>Enterprise AI</span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">K</span>
+            <span className={cn('text-sm font-semibold tracking-tight', collapsed && 'lg:hidden')}>Knova</span>
           </NavLink>
           <Button className="lg:hidden" size="icon" variant="ghost" onClick={onClose}><X size={18} /></Button>
         </div>
         <nav className="flex-1 space-y-1 px-3 py-5">
           <p className={cn('mb-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground', collapsed && 'lg:hidden')}>Workspace</p>
-          {navigation.map(({ label, path, icon: Icon }) => (
+          {visibleNavigation.map(({ label, path, icon: Icon }) => (
             <NavLink
               key={path}
               className={({ isActive }) =>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { Outlet } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { useUiStore } from '../../store/ui-store';
@@ -7,9 +7,11 @@ import { Sidebar } from './sidebar';
 import { Topbar } from './topbar';
 
 export function AppLayout() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const theme = useUiStore((state) => state.theme);
+  const sidebarOpen = useUiStore((state) => state.sidebarOpen);
+  const toggleSidebar = useUiStore((state) => state.toggleSidebar);
+  const closeSidebar = useUiStore((state) => state.closeSidebar);
 
   useEffect(() => {
     document.documentElement.classList.toggle('light', theme === 'light');
@@ -17,20 +19,9 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Sidebar open={sidebarOpen} collapsed={collapsed} onClose={() => setSidebarOpen(false)} />
+      <Sidebar open={sidebarOpen} collapsed={collapsed} onClose={closeSidebar} />
       <div className={collapsed ? 'lg:pl-[88px]' : 'lg:pl-64'}>
-        <Topbar onMenuClick={() => setSidebarOpen(true)} />
-        <div className="hidden h-0 lg:block">
-          <Button
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className="fixed left-4 top-[76px] z-30 text-muted-foreground"
-            size="icon"
-            variant="ghost"
-            onClick={() => setCollapsed((value) => !value)}
-          >
-            {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-          </Button>
-        </div>
+        <Topbar collapsed={collapsed} onMenuClick={toggleSidebar} onToggleCollapsed={() => setCollapsed((value) => !value)} />
         <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
           <Outlet />
         </main>
@@ -39,7 +30,7 @@ export function AppLayout() {
         aria-label="Open navigation"
         className="fixed bottom-5 right-5 z-20 lg:hidden"
         size="icon"
-        onClick={() => setSidebarOpen(true)}
+        onClick={toggleSidebar}
       >
         <Menu size={18} />
       </Button>

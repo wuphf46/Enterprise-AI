@@ -1,28 +1,29 @@
+import logging
 import re
 import uuid
 from pathlib import Path
-from fastapi import FastAPI, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi import Cookie, FastAPI, Depends, HTTPException, Response
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from app.observability import initialize
-from app.demo_context import principal, Principal
+from app.auth import REFRESH_COOKIE, LoginRequest, RegisterRequest, current_principal, admin_principal, login, logout, refresh, register
+from app.demo_context import Principal
 from app.aws import client
 from app.config import settings
 from app.db import connection, audit
 from app.rag import chat
 from app.guardrails import check_input, classify_input
-from app.memory import history, save_turn, list_messages
+from app.memory import assert_owned, history, save_turn, list_messages
+from app.vector import delete_document as delete_document_vectors
 from worker.ingest import process_s3_key
 
-initialize()
+log=logging.getLogger(__name__)
 
 
-BASE=Path(__file__).resolve().parent
-app=FastAPI(title='Enterprise RAG',docs_url='/api/docs')
-app.mount('/static',StaticFiles(directory=BASE/'static'),name='static')
-templates=Jinja2Templates(directory=BASE/'templates')
+app=FastAPI(title='Knova',docs_url='/api/docs')
+origins=[origin.strip() for origin in settings().cors_origins.split(',') if origin.strip()]
+if origins:
+    app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True,
+                       allow_methods=['GET','POST','PUT','OPTIONS'], allow_headers=['Authorization','Content-Type'])
 
 
 
@@ -39,11 +40,27 @@ class Feedback(BaseModel):
     note:str=Field(default='',max_length=500)
 
 
+@app.post('/api/auth/login')
+def auth_login(body:LoginRequest,response:Response):
+    return login(response,body)
 
-@app.get('/',response_class=HTMLResponse)
-def home(request:Request):
-    return templates.TemplateResponse('index.html',{'request':request,'region':settings().aws_region,
-        'mode':'single-workspace demo'})
+@app.post('/api/auth/register',status_code=201)
+def auth_register(body:RegisterRequest):
+    return register(body)
+
+@app.post('/api/auth/refresh')
+def auth_refresh(response:Response,refresh_token: str | None = Cookie(default=None, alias=REFRESH_COOKIE)):
+    return refresh(response,refresh_token)
+
+@app.post('/api/auth/logout')
+def auth_logout(response:Response,refresh_token: str | None = Cookie(default=None, alias=REFRESH_COOKIE)):
+    return logout(response,refresh_token)
+
+@app.get('/api/auth/me')
+def auth_me(p:Principal=Depends(current_principal)):
+    with connection() as conn:
+        user=conn.execute('SELECT username,tenant_id,role,groups FROM users WHERE id=%s',(p.subject,)).fetchone()
+    return {'id':p.subject,'username':user['username'],'tenant':user['tenant_id'],'role':user['role'],'groups':user['groups']}
 
 
 
@@ -63,7 +80,7 @@ def ready():
 
 
 @app.post('/api/documents/uploads')
-def create_upload(body:Upload,p:Principal=Depends(principal)):
+def create_upload(body:Upload,p:Principal=Depends(current_principal)):
     suffix=Path(body.filename).suffix.lower()
     if suffix not in {'.pdf','.docx','.txt','.md'}:
         raise HTTPException(400,'Allowed types: PDF, DOCX, TXT, MD')
@@ -85,10 +102,11 @@ class CompleteUpload(BaseModel):
     document_id:uuid.UUID
 
 @app.post('/api/documents/complete')
-def complete_upload(body:CompleteUpload,p:Principal=Depends(principal)):
+def complete_upload(body:CompleteUpload,p:Principal=Depends(current_principal)):
     with connection() as conn:
-        row=conn.execute("""SELECT s3_key,status FROM documents WHERE id=%s AND tenant_id=%s""",
-                         (body.document_id,p.tenant)).fetchone()
+        row=conn.execute("""SELECT s3_key,status FROM documents
+                            WHERE id=%s AND tenant_id=%s AND owner_sub=%s""",
+                         (body.document_id,p.tenant,p.subject)).fetchone()
     if not row: raise HTTPException(404,'Document not found')
     if row['status']=='ready': return {'status':'ready'}
     if row['status']=='processing': raise HTTPException(409,'Already processing')
@@ -101,7 +119,7 @@ def complete_upload(body:CompleteUpload,p:Principal=Depends(principal)):
 
 
 @app.get('/api/documents')
-def documents(p:Principal=Depends(principal)):
+def documents(p:Principal=Depends(current_principal)):
     with connection() as conn:
         rows=conn.execute('''SELECT id,title,status,current_version,created_at,allowed_groups FROM documents
             WHERE tenant_id=%s AND (allowed_groups && %s::text[] OR owner_sub=%s)
@@ -109,10 +127,33 @@ def documents(p:Principal=Depends(principal)):
     return {'documents':rows}
 
 
+@app.delete('/api/documents/{document_id}')
+def delete_document(document_id:uuid.UUID,p:Principal=Depends(admin_principal)):
+    with connection() as conn:
+        row=conn.execute('SELECT s3_key,title FROM documents WHERE id=%s AND tenant_id=%s',
+                         (document_id,p.tenant)).fetchone()
+    if not row: raise HTTPException(404,'Document not found')
+    try:
+        delete_document_vectors(p.tenant,str(document_id))
+    except Exception as exc:
+        log.exception('Vector cleanup failed for document %s',document_id)
+        raise HTTPException(502,'Could not remove document embeddings; deletion aborted.') from exc
+    try:
+        client('s3').delete_object(Bucket=settings().s3_bucket,Key=row['s3_key'])
+    except Exception:
+        log.exception('S3 cleanup failed for document %s',document_id)
+    with connection() as conn:
+        deleted=conn.execute('DELETE FROM documents WHERE id=%s AND tenant_id=%s RETURNING id',
+                             (document_id,p.tenant)).fetchone()
+        if not deleted: raise HTTPException(404,'Document not found')
+        audit(conn,p.subject,p.tenant,'document_deleted',{'document_id':str(document_id),'title':row['title']})
+    return {'deleted':True,'document_id':str(document_id)}
+
+
 
 
 @app.post('/api/chat')
-def ask(body:Ask,p:Principal=Depends(principal)):
+def ask(body:Ask,p:Principal=Depends(current_principal)):
     reason=classify_input(body.question)
     if reason:
         with connection() as conn:
@@ -124,9 +165,17 @@ def ask(body:Ask,p:Principal=Depends(principal)):
             audit(conn,p.subject,p.tenant,'approval_requested',{'id':str(row['id'])})
         return {'answer':'This request requires administrator approval before any action. Open the Approvals tab to review it.','sources':[],'status':'pending_approval','approval_id':str(row['id'])}
     conversation_id=body.conversation_id or uuid.uuid4()
-    prior=history(p.tenant,conversation_id)
+    if body.conversation_id:
+        try:
+            assert_owned(p.tenant,conversation_id,p.subject)
+        except PermissionError as exc:
+            raise HTTPException(403,'Conversation access denied') from exc
+    prior=history(p.tenant,conversation_id,p.subject)
     result=chat(p,body.question,prior)
-    save_turn(p.tenant,conversation_id,body.question,result['answer'])
+    try:
+        save_turn(p.tenant,conversation_id,p.subject,body.question,result['answer'])
+    except PermissionError as exc:
+        raise HTTPException(403,'Conversation access denied') from exc
     if result.get('answer')=='The response was blocked by the sensitive-data output guardrail.':
         with connection() as conn:
             audit(conn,p.subject,p.tenant,'guardrail_output_blocked',{'conversation_id':str(conversation_id)})
@@ -135,18 +184,18 @@ def ask(body:Ask,p:Principal=Depends(principal)):
     return {**result,'conversation_id':str(conversation_id)}
 
 @app.get('/api/conversations/{conversation_id}/messages')
-def conversation_messages(conversation_id:uuid.UUID,p:Principal=Depends(principal)):
-    return {'conversation_id':str(conversation_id),'messages':list_messages(p.tenant,conversation_id)}
+def conversation_messages(conversation_id:uuid.UUID,p:Principal=Depends(current_principal)):
+    return {'conversation_id':str(conversation_id),'messages':list_messages(p.tenant,conversation_id,p.subject)}
 
 @app.post('/api/feedback')
-def feedback(body:Feedback,p:Principal=Depends(principal)):
+def feedback(body:Feedback,p:Principal=Depends(current_principal)):
     with connection() as conn:
         conn.execute('INSERT INTO feedback(tenant_id,actor,rating,note) VALUES (%s,%s,%s,%s)',
                      (p.tenant,p.subject,body.rating,body.note))
     return {'saved':True}
 
 @app.get('/api/admin/metrics')
-def metrics(p:Principal=Depends(principal)):
+def metrics(p:Principal=Depends(admin_principal)):
     with connection() as conn:
         docs=conn.execute('SELECT status,count(*) AS total FROM documents WHERE tenant_id=%s GROUP BY status',(p.tenant,)).fetchall()
         fb=conn.execute('SELECT rating,count(*) AS total FROM feedback WHERE tenant_id=%s GROUP BY rating',(p.tenant,)).fetchall()
@@ -159,15 +208,13 @@ class ApprovalDecision(BaseModel):
     approve:bool
     
 @app.get('/api/approvals')
-def list_approvals(p:Principal=Depends(principal)):
-    if not p.admin: raise HTTPException(403,'Admin only')
+def list_approvals(p:Principal=Depends(admin_principal)):
     with connection() as conn:
         rows=conn.execute("SELECT id,requester,question,status,reviewer,created_at,reviewed_at FROM approvals WHERE tenant_id=%s ORDER BY created_at DESC LIMIT 100",(p.tenant,)).fetchall()
     return {'approvals':rows}
 
 @app.post('/api/approvals/{approval_id}/decision')
-def decide(approval_id:uuid.UUID,body:ApprovalDecision,p:Principal=Depends(principal)):
-    if not p.admin: raise HTTPException(403,'Admin only')
+def decide(approval_id:uuid.UUID,body:ApprovalDecision,p:Principal=Depends(admin_principal)):
     with connection() as conn:
         row=conn.execute("UPDATE approvals SET status=%s,reviewer=%s,reviewed_at=now() WHERE id=%s AND tenant_id=%s AND status='pending' RETURNING id",('approved' if body.approve else 'rejected',p.subject,approval_id,p.tenant)).fetchone()
         if not row: raise HTTPException(404,'Pending approval not found')
@@ -176,8 +223,7 @@ def decide(approval_id:uuid.UUID,body:ApprovalDecision,p:Principal=Depends(princ
     return {'status':'approved' if body.approve else 'rejected','executed':False}
 
 @app.get('/api/admin/guardrails')
-def guardrail_metrics(p:Principal=Depends(principal)):
-    if not p.admin: raise HTTPException(403,'Admin only')
+def guardrail_metrics(p:Principal=Depends(admin_principal)):
     with connection() as conn:
         rows=conn.execute("""SELECT action,count(*) AS total FROM audit_events
             WHERE tenant_id=%s AND action IN ('guardrail_input_blocked','guardrail_output_blocked')

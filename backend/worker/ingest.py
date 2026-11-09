@@ -7,9 +7,6 @@ from app.aws import client, embed
 from app.vector import upsert
 from app.config import settings
 from app.db import connection, audit
-from app.observability import trace, initialize
-
-initialize()
 
 logging.basicConfig(level=logging.INFO,format='%(asctime)s %(levelname)s %(message)s')
 log=logging.getLogger('enterprise.worker')
@@ -37,7 +34,6 @@ def chunks(text, size=1200, overlap=180):
 
 
 
-@trace("process_s3_key")
 def process_s3_key(key):
     s=settings()
     with connection() as conn:

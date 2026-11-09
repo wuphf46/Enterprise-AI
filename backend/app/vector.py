@@ -1,8 +1,8 @@
-from app.observability import trace
 import logging
 import time
 from functools import lru_cache
 from pinecone import Pinecone, ServerlessSpec
+from pinecone.exceptions import NotFoundException
 from app.config import settings
 
 
@@ -51,11 +51,9 @@ def index():
 def namespace(tenant):
     return 'tenant-' + tenant
 
-@trace("upsert")
 def upsert(tenant, records):
     return index().upsert(vectors=records, namespace=namespace(tenant))
 
-@trace("search")
 def search(tenant, vector, groups, owner, limit=5):
     acl = {'$or': [{'allowed_groups': {'$in': list(groups)}},
                    {'owner_sub': {'$eq': owner}}]}
@@ -64,6 +62,12 @@ def search(tenant, vector, groups, owner, limit=5):
     return [{'id': m.id, 'score': m.score, 'metadata': m.metadata or {}}
             for m in result.matches]
 
-def delete_document(tenant, ids):
-    if ids:
-        index().delete(ids=ids, namespace=namespace(tenant))
+def delete_document(tenant, document_id):
+    """Remove every chunk/version of a document from the tenant namespace."""
+    try:
+        return index().delete(namespace=namespace(tenant),
+                              filter={'document_id': {'$eq': str(document_id)}})
+    except NotFoundException:
+        # No vectors were ever written for this tenant (or namespace), so there is
+        # nothing to remove. Treat it as a successful no-op.
+        return None

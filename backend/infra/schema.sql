@@ -1,3 +1,25 @@
+CREATE TABLE IF NOT EXISTS users (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ username text NOT NULL UNIQUE,
+ password_hash text NOT NULL,
+ tenant_id text NOT NULL,
+ role text NOT NULL CHECK(role IN ('user','admin')),
+ groups text[] NOT NULL DEFAULT ARRAY['workspace'],
+ disabled boolean NOT NULL DEFAULT false,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS users_tenant_idx ON users(tenant_id);
+
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+ id bigserial PRIMARY KEY,
+ token_hash text NOT NULL UNIQUE,
+ user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ expires_at timestamptz NOT NULL,
+ revoked_at timestamptz,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS refresh_tokens_user_idx ON refresh_tokens(user_id,expires_at);
+
 CREATE TABLE IF NOT EXISTS documents (
  id uuid PRIMARY KEY, tenant_id text NOT NULL, title text NOT NULL, owner_sub text NOT NULL,
  allowed_groups text[] NOT NULL, s3_key text NOT NULL UNIQUE,
@@ -33,3 +55,11 @@ CREATE TABLE IF NOT EXISTS chat_messages (
  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS chat_messages_session_idx ON chat_messages(tenant_id,conversation_id,id DESC);
+
+CREATE TABLE IF NOT EXISTS conversations (
+ id uuid PRIMARY KEY,
+ tenant_id text NOT NULL,
+ owner_sub uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS conversations_owner_idx ON conversations(tenant_id,owner_sub,id);

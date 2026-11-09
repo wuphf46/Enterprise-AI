@@ -171,13 +171,15 @@ jobs:
 
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-          RIUS_API_KEY: ${{ secrets.RIUS_API_KEY }}
-          RIUS_SERVICE_NAME: ${{ secrets.RIUS_SERVICE_NAME }}
-          RIUS_DISABLED: ${{ secrets.RIUS_DISABLED }}
-          RIUS_CAPTURE_CONTENT: ${{ secrets.RIUS_CAPTURE_CONTENT }}
-
           HITL_ENABLED: ${{ secrets.HITL_ENABLED }}
           MEMORY_TURNS: ${{ secrets.MEMORY_TURNS }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
+          JWT_AUDIENCE: ${{ secrets.JWT_AUDIENCE }}
+          ACCESS_TOKEN_MINUTES: ${{ secrets.ACCESS_TOKEN_MINUTES }}
+          REFRESH_TOKEN_DAYS: ${{ secrets.REFRESH_TOKEN_DAYS }}
+          AUTH_COOKIE_SECURE: ${{ secrets.AUTH_COOKIE_SECURE }}
+          CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
 
         run: |
           set -euo pipefail
@@ -196,12 +198,15 @@ jobs:
             PINECONE_REGION
             PINECONE_READY_TIMEOUT
             DATABASE_URL
-            RIUS_API_KEY
-            RIUS_SERVICE_NAME
-            RIUS_DISABLED
-            RIUS_CAPTURE_CONTENT
             HITL_ENABLED
             MEMORY_TURNS
+            JWT_SECRET_KEY
+            JWT_ISSUER
+            JWT_AUDIENCE
+            ACCESS_TOKEN_MINUTES
+            REFRESH_TOKEN_DAYS
+            AUTH_COOKIE_SECURE
+            CORS_ORIGINS
           )
 
           for name in "${REQUIRED[@]}"; do
@@ -251,15 +256,16 @@ jobs:
           # PostgreSQL
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-          # RIUS Observability
-          RIUS_API_KEY: ${{ secrets.RIUS_API_KEY }}
-          RIUS_SERVICE_NAME: ${{ secrets.RIUS_SERVICE_NAME }}
-          RIUS_DISABLED: ${{ secrets.RIUS_DISABLED }}
-          RIUS_CAPTURE_CONTENT: ${{ secrets.RIUS_CAPTURE_CONTENT }}
-
           # Application
           HITL_ENABLED: ${{ secrets.HITL_ENABLED }}
           MEMORY_TURNS: ${{ secrets.MEMORY_TURNS }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
+          JWT_AUDIENCE: ${{ secrets.JWT_AUDIENCE }}
+          ACCESS_TOKEN_MINUTES: ${{ secrets.ACCESS_TOKEN_MINUTES }}
+          REFRESH_TOKEN_DAYS: ${{ secrets.REFRESH_TOKEN_DAYS }}
+          AUTH_COOKIE_SECURE: ${{ secrets.AUTH_COOKIE_SECURE }}
+          CORS_ORIGINS: ${{ secrets.CORS_ORIGINS }}
 
         run: |
           set -euo pipefail
@@ -281,12 +287,15 @@ jobs:
             -e PINECONE_REGION \
             -e PINECONE_READY_TIMEOUT \
             -e DATABASE_URL \
-            -e RIUS_API_KEY \
-            -e RIUS_SERVICE_NAME \
-            -e RIUS_DISABLED \
-            -e RIUS_CAPTURE_CONTENT \
             -e HITL_ENABLED \
             -e MEMORY_TURNS \
+            -e JWT_SECRET_KEY \
+            -e JWT_ISSUER \
+            -e JWT_AUDIENCE \
+            -e ACCESS_TOKEN_MINUTES \
+            -e REFRESH_TOKEN_DAYS \
+            -e AUTH_COOKIE_SECURE \
+            -e CORS_ORIGINS \
             -p 8000:8000 \
             "$IMAGE"
 
