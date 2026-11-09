@@ -158,7 +158,6 @@ python backend/scripts/create_user.py
 uvicorn app.main:app --app-dir backend --reload --port 8000
 ```
 
-The database script is safe to rerun. `create_user.py` prompts for username, tenant, role (`user` or `admin`), and password without storing plaintext.
 
 ### Frontend
 
